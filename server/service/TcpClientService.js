@@ -34,7 +34,7 @@ exports.getTcpClientRemoteAddress = function(uuid) {
  * returns inline_response_200_28
  **/
 exports.getTcpClientRemotePort = function(uuid) {
-  return new Promise(function(resolve, reject) {
+  return new Promise(async function(resolve, reject) {
     try{
       var value =await fileOperation.readFromDatabaseAsync(uuid);
       var response ={};
