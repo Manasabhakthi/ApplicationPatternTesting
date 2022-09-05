@@ -8,7 +8,7 @@ var fileOperation = require('onf-core-model-ap/applicationPattern/databaseDriver
  * returns inline_response_200_18
  **/
 exports.getTcpServerLocalAddress = function(uuid) {
-  return new Promise(function(resolve, reject) {
+  return new Promise(async function(resolve, reject) {
     try{
       var value =await fileOperation.readFromDatabaseAsync(uuid);
       var response ={};
