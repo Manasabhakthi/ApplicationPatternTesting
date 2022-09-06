@@ -8,6 +8,10 @@ const httpClientInterface = require('onf-core-model-ap/applicationPattern/onfMod
 const tcpClientInterface = require('onf-core-model-ap/applicationPattern/onfModel/models/layerProtocols/TcpClientInterface');
 const TcpServerInterface = require('onf-core-model-ap/applicationPattern/onfModel/models/layerProtocols/TcpServerInterface');
 const ForwardingAutomationService = require('onf-core-model-ap/applicationPattern/onfModel/services/ForwardingConstructAutomationServices');
+const softwareUpgrade = require('./individualServices/SoftwareUpgrade');
+const LogicalTerminatinPointConfigurationInput = require('onf-core-model-ap/applicationPattern/onfModel/services/models/logicalTerminationPoint/ConfigurationInput');
+const prepareForwardingAutomation = require('./individualServices/PrepareForwardingAutomation');
+
 
 /*
  * Initiates process of embedding a new release
@@ -20,27 +24,28 @@ const ForwardingAutomationService = require('onf-core-model-ap/applicationPatter
  * customerJourney String Holds information supporting customer’s journey to which the execution applies
  * no response value expected for this operation
  **/
-exports.bequeathYourDataAndDie = function(body,user,originator,xCorrelator,traceIndicator,customerJourney) {
+exports.bequeathYourDataAndDie = function(body,user,originator,xCorrelator,traceIndicator,customerJourney,operationServerName) {
   return new Promise(async function(resolve, reject) {
     try {
-
+	
       let applicationName = body["new-application-name"];
       let releaseNumber = body["new-application-release"];
       let applicationAddress = body["new-application-address"];
       let applicationPort = body["new-application-port"];
-
+      
       let isdataTransferRequired = true;
+      let newReleaseUuid = await httpClientInterface.getHttpClientUuidAsync("NewRelease");
       let currentApplicationName = await httpServerInterface.getApplicationNameAsync();
       if (currentApplicationName == applicationName) {
-        let isUpdated = await httpClientInterface.setReleaseNumberAsync("aae-1-0-0-http-c-bm-or-1-0-0-001", releaseNumber);
+        let isUpdated = await httpClientInterface.setReleaseNumberAsync(newReleaseUuid, releaseNumber);
         let currentApplicationRemoteAddress = await TcpServerInterface.getLocalAddress();
         let currentApplicationRemotePort = await TcpServerInterface.getLocalPort();
         if ((applicationAddress == currentApplicationRemoteAddress) &&
           (applicationPort == currentApplicationRemotePort)) {
-          isdataTransferRequired = true;
+          isdataTransferRequired = false;
         }
         if (isUpdated) {
-          applicationName = await httpClientInterface.getApplicationNameAsync("aae-1-0-0-http-c-bm-or-1-0-0-001");
+          applicationName = await httpClientInterface.getApplicationNameAsync(newReleaseUuid);
           let operationList = [];
           let logicalTerminatinPointConfigurationInput = new LogicalTerminatinPointConfigurationInput(
             applicationName,
@@ -49,15 +54,12 @@ exports.bequeathYourDataAndDie = function(body,user,originator,xCorrelator,trace
             applicationPort,
             operationList
           );
-
           let logicalTerminationPointconfigurationStatus = await LogicalTerminationPointService.createOrUpdateApplicationInformationAsync(
             logicalTerminatinPointConfigurationInput
           );
-
           let forwardingAutomationInputList = await prepareForwardingAutomation.bequeathYourDataAndDie(
             logicalTerminationPointconfigurationStatus
-          );y
-
+          );
           ForwardingAutomationService.automateForwardingConstructAsync(
             operationServerName,
             forwardingAutomationInputList,
@@ -66,12 +68,12 @@ exports.bequeathYourDataAndDie = function(body,user,originator,xCorrelator,trace
             traceIndicator,
             customerJourney
           );
-
         }
-
       }
-
-      
+      softwareUpgrade.upgradeSoftwareVersion(isdataTransferRequired, user, xCorrelator, traceIndicator, customerJourney)
+        .catch(err => console.log(`upgradeSoftwareVersion failed with error: ${err}`));
+      resolve();
+          
     } catch (error) {
       console.log(error);
     }
